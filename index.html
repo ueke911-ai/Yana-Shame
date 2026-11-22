@@ -308,7 +308,6 @@
             font-weight: 600;
         }
 
-        /* Переключатель темы */
         .theme-switch {
             display: flex;
             background-color: var(--input-bg);
@@ -336,7 +335,6 @@
             background-color: var(--card-bg);
         }
 
-        /* Поле ввода */
         .password-input {
             width: 100%;
             background-color: var(--input-bg);
@@ -359,7 +357,6 @@
             border-color: var(--btn-blue-border);
         }
 
-        /* Кнопки */
         .btn-primary {
             width: 100%;
             padding: 16px;
@@ -419,7 +416,7 @@
         }
 
         .btn-green {
-            background-color: #66bb6a; /* Яркий зеленый как на скрине */
+            background-color: #66bb6a;
             color: #1c1c24;
             border-bottom: 6px solid #4caf50;
             font-size: 18px;
@@ -535,11 +532,11 @@
 
                 <div class="stats-row">
                     <div class="stat-card">
-                        <div class="stat-value">0</div>
+                        <div class="stat-value" id="best-streak">0</div>
                         <div class="stat-label">лучший удар, дней</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value">0</div>
+                        <div class="stat-value" id="total-days">0</div>
                         <div class="stat-label">всего дней</div>
                     </div>
                 </div>
@@ -550,7 +547,6 @@
                 <div class="settings-content">
                     <h1 class="settings-title">Настройки</h1>
                     
-                    <!-- Карточка темы -->
                     <div class="settings-card">
                         <div class="settings-card-title">Тема</div>
                         <div class="settings-card-desc">Выбери, как выглядит приложение.</div>
@@ -560,7 +556,6 @@
                         </div>
                     </div>
 
-                    <!-- Карточка пароля -->
                     <div class="settings-card">
                         <div class="settings-card-title">Место Виолетты</div>
                         <div class="settings-card-desc">Введи пароль, чтобы открыть особый экран.</div>
@@ -573,18 +568,15 @@
             <!-- СЕКРЕТНЫЙ ЭКРАН (МЕСТО ВИОЛЕТТЫ) -->
             <div id="screen-violet" class="screen">
                 <div class="violet-screen">
-                    <!-- Иконка капли из скриншота -->
                     <svg class="violet-icon" viewBox="0 0 100 120" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M50 10C50 10 85 55 85 80C85 100 69.3 115 50 115C30.7 115 15 100 15 80C15 55 50 10 50 10Z" fill="#8bc6fd"/>
                         <path d="M50 45C50 45 68 70 68 82C68 92 60 100 50 100C40 100 32 92 32 82C32 70 50 45 50 45Z" fill="#26b3f9"/>
                     </svg>
-                    
                     <h1 class="violet-title">Место Виолетты</h1>
                     <p class="violet-desc">
                         Только здесь можно продолжить серию.<br>
                         Сейчас серия: <span id="violet-streak-count">0</span> дней.
                     </p>
-                    
                     <button class="btn-primary btn-green" onclick="continueStreak()">ПРОДОЛЖИТЬ СЕРИЮ</button>
                 </div>
             </div>
@@ -609,37 +601,62 @@
         </nav>
     </div>
 
-    <script>
-        // Пароль для секретного экрана
-        const SECRET_PASSWORD = "676977881504";
+    <!-- ПОДКЛЮЧАЕМ FIREBASE SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, onValue, set, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        // ВАШ КОНФИГ
+        const firebaseConfig = {
+            apiKey: "AIzaSyAixcUC4sb5wSn4Zisz_fKJgHNvqRTbGfU",
+            authDomain: "streak-fbeb7.firebaseapp.com",
+            databaseURL: "https://streak-fbeb7-default-rtdb.firebaseio.com", // <-- УБЕДИТЕСЬ, ЧТО ССЫЛКА ВЕРНАЯ
+            projectId: "streak-fbeb7",
+            storageBucket: "streak-fbeb7.firebasestorage.app",
+            messagingSenderId: "310050426056",
+            appId: "1:310050426056:web:3c207a53831abd43e129fd",
+            measurementId: "G-NT801HWPX3"
+        };
+
+        // Инициализация Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
         
-        // Переменные для счета
+        // Ссылка на данные в базе
+        const streakRef = ref(db, 'gameData/streak');
+
+        // Переменные
         let mainStreak = 0;
-        let violetStreak = 0;
+        const SECRET_PASSWORD = "676977881504";
 
-        // Функция переключения вкладок
-        function switchTab(tabName, btn) {
-            document.querySelectorAll('.screen').forEach(screen => {
-                screen.classList.remove('active');
-            });
-            
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.classList.remove('active');
-            });
+        // 1. СЛУШАЕМ ИЗМЕНЕНИЯ В БАЗЕ (Синхронизация для всех)
+        onValue(streakRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data !== null) {
+                mainStreak = data;
+                document.getElementById('main-streak-count').textContent = mainStreak;
+                document.getElementById('violet-streak-count').textContent = mainStreak;
+                document.getElementById('best-streak').textContent = mainStreak;
+                document.getElementById('total-days').textContent = mainStreak;
+            } else {
+                set(streakRef, 0);
+            }
+        });
 
-            // Если переключаемся на главную или настройки
+        // --- ФУНКЦИИ ИНТЕРФЕЙСА ---
+        window.switchTab = function(tabName, btn) {
+            document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
             if(tabName === 'main' || tabName === 'settings') {
                 document.getElementById(`screen-${tabName}`).classList.add('active');
                 btn.classList.add('active');
             }
         }
 
-        // Смена темы
-        function setTheme(theme) {
+        window.setTheme = function(theme) {
             const body = document.body;
             const btnLight = document.getElementById('btn-light');
             const btnDark = document.getElementById('btn-dark');
-
             if (theme === 'light') {
                 body.classList.add('light-theme');
                 btnLight.classList.add('active');
@@ -651,24 +668,16 @@
             }
         }
 
-        // Проверка пароля
-        function checkPassword() {
+        window.checkPassword = function() {
             const input = document.getElementById('password-input').value;
             const settingsScreen = document.getElementById('screen-settings');
             const violetScreen = document.getElementById('screen-violet');
             const navSettings = document.getElementById('nav-settings');
-            const navMain = document.getElementById('nav-main');
 
             if (input === SECRET_PASSWORD) {
-                // Скрываем настройки, показываем секретный экран
                 settingsScreen.classList.remove('active');
                 violetScreen.classList.add('active');
-                
-                // Визуально убираем активность с кнопок навигации (или оставляем настройки активными)
-                // Для красоты снимем выделение, т.к. мы на скрытом экране
                 navSettings.classList.remove('active');
-                
-                // Очищаем поле ввода
                 document.getElementById('password-input').value = '';
             } else {
                 alert("Неверный пароль!");
@@ -676,62 +685,49 @@
             }
         }
 
-        // Продолжение серии (только на секретном экране)
-        function continueStreak() {
-            violetStreak++;
-            mainStreak++; // Предполагаем, что основная серия тоже растет
-            
-            // Обновляем цифры
-            document.getElementById('violet-streak-count').textContent = violetStreak;
-            document.getElementById('main-streak-count').textContent = mainStreak;
-            
-            // Визуальный отклик (можно добавить анимацию)
-            const btn = event.target;
-            btn.textContent = "СЕРИЯ ПРОДОЛЖЕНА!";
-            btn.style.backgroundColor = "#4caf50";
-            
-            setTimeout(() => {
-                btn.textContent = "ПРОДОЛЖИТЬ СЕРИЮ";
-                btn.style.backgroundColor = "#66bb6a";
-            }, 1000);
+        // 2. ПРОДОЛЖЕНИЕ СЕРИИ (Запись в БД)
+        window.continueStreak = function() {
+            runTransaction(streakRef, (currentData) => {
+                return (currentData || 0) + 1;
+            }).then(() => {
+                const btn = event.target;
+                btn.textContent = "СЕРИЯ ПРОДОЛЖЕНА!";
+                btn.style.backgroundColor = "#4caf50";
+                setTimeout(() => {
+                    btn.textContent = "ПРОДОЛЖИТЬ СЕРИЮ";
+                    btn.style.backgroundColor = "#66bb6a";
+                }, 1000);
+            }).catch((error) => {
+                console.error("Ошибка записи: ", error);
+                alert("Не удалось сохранить. Проверьте правила безопасности в Firebase.");
+            });
         }
+
+        // Обработка навигации (возврат с секретного экрана)
+        document.getElementById('nav-main').addEventListener('click', function() {
+             document.getElementById('screen-violet').classList.remove('active');
+        });
 
         // Генерация календаря
         function generateCalendar() {
             const grid = document.getElementById('calendar-grid');
             grid.innerHTML = '';
-
             const daysInMonth = 30;
-            const startDayOfWeek = 6; // Ноябрь 2026 начинается с воскресенья
-
+            const startDayOfWeek = 6; 
             for (let i = 0; i < startDayOfWeek; i++) {
                 const emptyDiv = document.createElement('div');
                 emptyDiv.className = 'calendar-day empty';
                 grid.appendChild(emptyDiv);
             }
-
             for (let i = 1; i <= daysInMonth; i++) {
                 const dayDiv = document.createElement('div');
                 dayDiv.className = 'calendar-day';
                 dayDiv.textContent = i;
-                
-                if (i === 22) {
-                    dayDiv.classList.add('active');
-                }
-                
+                if (i === 22) dayDiv.classList.add('active');
                 grid.appendChild(dayDiv);
             }
         }
-
-        // Обработка возврата на главную с секретного экрана через нижнее меню
-        document.getElementById('nav-main').addEventListener('click', function() {
-             // Если мы были на секретном экране, при клике на главную надо его скрыть
-             document.getElementById('screen-violet').classList.remove('active');
-        });
-
-        document.addEventListener('DOMContentLoaded', () => {
-            generateCalendar();
-        });
+        generateCalendar();
     </script>
 </body>
 </html>
